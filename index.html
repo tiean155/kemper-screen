@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kemper Screen Simulator 4.0</title>
+<style>
+:root { color-scheme: dark; --pur:#B58CFF; --acc:#FFB020; --on:#3DDC97; }
+* { box-sizing: border-box; }
+body { margin:0; background:#15171b; color:#e6e9ee; font-family: system-ui, 'Noto Sans Thai', 'Segoe UI', sans-serif; }
+header.bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:12px 16px; background:#1d2026; border-bottom:1px solid #2b3038; }
+button, select { font:inherit; color:inherit; background:#2a2f37; border:1px solid #3a414c; border-radius:8px; padding:8px 12px; min-height:38px; cursor:pointer; }
+button.primary { background:#FFB020; color:#1b1200; border-color:#FFB020; font-weight:700; }
+button:hover { filter:brightness(1.15); }
+#status { font-size:13px; color:#9aa3ae; }
+#status.ok { color:#3DDC97; } #status.err { color:#ff7b7b; }
+.sub { padding:8px 16px; display:flex; flex-wrap:wrap; gap:14px; align-items:center; font-size:13px; color:#9aa3ae; border-bottom:1px solid #2b3038; }
+.sub label { display:flex; align-items:center; gap:5px; cursor:pointer; }
+#blockChecks { display:flex; flex-wrap:wrap; gap:10px; }
+main { display:flex; justify-content:center; padding:28px 16px 40px; }
+#stage { position:relative; }
+#device { position:absolute; left:0; top:0; width:480px; height:320px; transform-origin: 0 0; border-radius:10px; overflow:hidden;
+  background:#0B0D10; color:#F2F4F7; font-family:'Inter', system-ui, sans-serif;
+  box-shadow: 0 0 0 10px #000, 0 0 0 11px #333, 0 18px 50px rgba(0,0,0,.6);
+  display:flex; flex-direction:column; justify-content:space-between; padding:14px 16px; }
+#name { font-size:58px; font-weight:800; line-height:1.1; letter-spacing:-0.02em; white-space:nowrap; overflow:hidden; }
+.row2 { display:flex; justify-content:space-between; align-items:center; margin-top:4px; }
+.bpm { display:flex; align-items:baseline; gap:6px; }
+.bpm b { font-size:46px; font-weight:700; line-height:1; font-variant-numeric:tabular-nums; }
+.bpm span { font-size:18px; font-weight:600; letter-spacing:.12em; color:#9AA3AE; }
+#fx { display:flex; flex-direction:column; gap:6px; }
+.frow { display:flex; gap:10px; }
+.chip { flex:1; min-width:0; border-radius:12px; padding:8px 12px; display:flex; flex-direction:column; justify-content:space-between; background:#14171C; border:1px solid #262B33; color:#9AA3AE; height:62px; }
+.chip.on { background:var(--on); border-color:transparent; color:#04170E; }
+.chip svg { width:26px; height:26px; flex:none; }
+.chip .n { font-size:16px; font-weight:600; line-height:1.15; max-height:2.3em; overflow:hidden; }
+.chip.on .n { font-weight:700; }
+.chip.empty { opacity:.6; border-style:dashed; background:transparent; }
+#fx.small .frow { gap:7px; }
+#fx.small .chip { padding:7px 7px; height:58px; border-radius:9px; }
+#fx.small .chip svg { width:22px; height:22px; }
+#fx.small .chip .n { font-size:13px; }
+.amp { height:24px; border-radius:8px; border:2px solid var(--acc); display:flex; align-items:center; justify-content:center; gap:8px; font-size:15px; font-weight:800; letter-spacing:.08em; }
+.amp small { font-size:13px; font-weight:600; color:#9AA3AE; }
+.wait { text-align:center; color:#9AA3AE; font-size:16px; padding:24px 0; }
+#tap { position:absolute; inset:0; background:#0B0D10; box-shadow: inset 0 0 0 5px var(--acc); padding:18px 20px; display:flex; flex-direction:column; opacity:0; pointer-events:none; transition:opacity .15s; }
+#tap.show { opacity:1; }
+#tuner { position:absolute; inset:0; background:#0B0D10; padding:16px 18px; display:flex; flex-direction:column; justify-content:space-between; opacity:0; pointer-events:none; transition:opacity .15s; }
+#tuner.show { opacity:1; }
+#tuner.ok { box-shadow: inset 0 0 0 5px var(--on); }
+.tn-head { display:flex; justify-content:space-between; font-size:16px; font-weight:700; letter-spacing:.18em; color:#9AA3AE; }
+.tn-tri { width:0; height:0; border-top:18px solid transparent; border-bottom:18px solid transparent; }
+.tn-meter { position:relative; height:52px; }
+.tn-meter i { position:absolute; width:2px; border-radius:1px; background:#4A525E; transform:translateX(-1px); }
+#tnNeedle { position:absolute; top:0; width:6px; height:52px; border-radius:3px; margin-left:-3px; }
+.tn-strobe { display:flex; flex-direction:column; gap:8px; overflow:hidden; border-radius:8px; }
+.tn-strobe div { height:40px; border-radius:6px; background-color:#14171C; }
+
+#tap .t { display:flex; justify-content:center; align-items:center; gap:10px; font-size:22px; font-weight:800; letter-spacing:.18em; color:var(--acc); }
+#tap .t i { width:12px; height:12px; border-radius:6px; background:var(--acc); display:block; }
+#tap .mid { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+#tap .big { font-size:176px; font-weight:800; line-height:1; letter-spacing:-0.03em; font-variant-numeric:tabular-nums; }
+#tap .u { font-size:30px; font-weight:700; letter-spacing:.2em; color:#9AA3AE; margin-top:2px; }
+#tap .track { height:8px; border-radius:4px; background:#1B1F26; overflow:hidden; }
+#tap .fill { height:100%; width:100%; background:var(--acc); border-radius:4px; transform-origin:left; }
+.mp { max-width:760px; margin:0 auto 24px; padding:14px 16px; background:#1d2026; border:1px solid #2b3038; border-radius:12px; font-size:13px; color:#9aa3ae; line-height:1.7; }
+.mp h3 { margin:0 0 6px; font-size:15px; color:#e6e9ee; }
+.mp .row { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0; }
+#mStatus { color:#e6e9ee; font-size:14px; }
+.hint { max-width:760px; margin:0 auto; padding:0 16px 30px; color:#9aa3ae; font-size:13px; line-height:1.7; }
+.hint b { color:#e6e9ee; }
+</style>
+</head>
+<body>
+<header class="bar">
+  <button class="primary" id="connect">เชื่อมต่อ Kemper</button>
+  <select id="inPort" title="พอร์ตรับ"><option value="">พอร์ตรับ</option></select>
+  <select id="outPort" title="พอร์ตส่ง"><option value="">พอร์ตส่ง</option></select>
+  <select id="speed" title="ความเร็วการถามเครื่อง">
+    <option value="40">ถามทุก 40 ms</option>
+    <option value="20">ถามทุก 20 ms</option>
+    <option value="10" selected>ถามทุก 10 ms</option>
+  </select>
+  <span id="status">ยังไม่ได้เชื่อมต่อ</span>
+</header>
+<div class="sub">
+  <span>ขนาดจอ:</span>
+  <button id="sFit">พอดีหน้าต่าง</button>
+  <button id="s1">x1 (480×320)</button>
+  <button id="sReal">จริง 4.0″ (จอกว้าง 84 มม.)</button>
+  <button id="sReal35">จริง 3.5″ (จอกว้าง 73 มม.)</button>
+  <button id="sBoard">จริง 3.5″ + กรอบบอร์ด 101.5×54.5 มม.</button>
+  <span>|</span>
+  <span>บล็อกที่แสดง:</span>
+  <span id="blockChecks"></span>
+  <button id="presetL1">Level 1 (A B DLY REV)</button>
+  <button id="presetAll">ทั้งหมดที่เครื่องตอบ</button>
+  <span>|</span>
+  <button id="tapBtn">จำลอง Tap Tempo (T)</button>
+  <span>|</span>
+  <button id="tnBtn">จำลอง Tuner (U)</button>
+  <select id="tnMode"><option value="chrom">Chromatic</option><option value="strobe">Strobe</option></select>
+  <select id="tnNoteSel"></select>
+  <label style="color:#9AA3AE;font-size:13px">cent <input type="range" id="tnCents" min="-50" max="50" value="-14" style="vertical-align:middle;width:160px"></label>
+  <label style="color:#9AA3AE;font-size:13px"><input type="checkbox" id="tnWob"> สั่นเอง</label>
+</div>
+<main>
+  <div id="stage">
+    <div id="device">
+      <div>
+        <div id="name">...</div>
+        <div class="row2">
+          <div class="bpm"><b id="bpm">...</b><span>BPM</span></div>
+        </div>
+      </div>
+      <div id="fx"></div>
+      <div id="tap">
+        <div class="t"><i></i>TAP TEMPO</div>
+        <div class="mid"><div class="big" id="tapNum">0</div><div class="u">BPM</div></div>
+        <div class="track"><div class="fill" id="tapFill"></div></div>
+      </div>
+      <div id="tuner">
+        <div id="tnChrom" style="display:flex;flex-direction:column;justify-content:space-between;height:100%">
+          <div class="tn-head"><div>TUNER</div><div>A = 440 Hz</div></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;flex:1">
+            <div class="tn-tri" id="tnL" style="border-right:28px solid #262B33"></div>
+            <div style="display:flex;align-items:flex-start"><div id="tnNote" style="font-size:150px;font-weight:800;line-height:1;letter-spacing:-0.03em">E</div><div id="tnOct" style="font-size:42px;font-weight:700;margin-top:14px;color:#9AA3AE">2</div></div>
+            <div class="tn-tri" id="tnR" style="border-left:28px solid #262B33"></div>
+          </div>
+          <div><div class="tn-meter" id="tnMeter"><div id="tnNeedle"></div></div>
+          <div id="tnTxt" style="text-align:center;font-size:26px;font-weight:800;font-variant-numeric:tabular-nums"></div></div>
+        </div>
+        <div id="tnStr" style="display:none;flex-direction:column;justify-content:space-between;height:100%">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="display:flex;align-items:flex-start"><div id="tnNote2" style="font-size:84px;font-weight:800;line-height:1;letter-spacing:-0.02em">E</div><div id="tnOct2" style="font-size:28px;font-weight:700;margin-top:8px;color:#9AA3AE">2</div></div>
+            <div style="text-align:right"><div id="tnTxt2" style="font-size:30px;font-weight:800;font-variant-numeric:tabular-nums"></div><div style="font-size:16px;font-weight:700;letter-spacing:.18em;color:#9AA3AE;margin-top:4px">STROBE · A = 440 Hz</div></div>
+          </div>
+          <div style="position:relative"><div class="tn-strobe" id="tnRows"><div></div><div></div><div></div></div>
+          <div style="position:absolute;left:50%;top:-6px;bottom:-6px;width:3px;margin-left:-1px;background:#F2F4F7;border-radius:2px"></div></div>
+          <div style="display:flex;justify-content:space-between;font-size:18px;font-weight:800;letter-spacing:.1em"><div id="tnFl">\u25C0 FLAT</div><div id="tnSh">SHARP \u25B6</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+<div class="hint">
+  <p><b>วิธีใช้</b> เสียบ USB ระหว่างคอมกับ Kemper (ปิด Rig Manager ก่อน) เปิดไฟล์นี้ด้วย Chrome หรือ Edge แล้วกดเชื่อมต่อ ชื่อ rig, BPM, ชื่อและไอคอนเอฟเฟคกับสถานะเปิดปิดจะตามเครื่องเองโดยไม่ต้องกดอะไร เปลี่ยนพรีเซตหรือเหยียบสวิตช์เอฟเฟคบนเครื่องได้เลย</p>
+  <p><b>Tap Tempo</b> เหยียบ tap บนเครื่อง หน้าตัวเลขใหญ่จะขึ้นทับ 3 วินาทีแล้วหายเอง ถ้าตอนเปลี่ยนพรีเซตไม่ขึ้น แปลว่าทำงานถูกต้อง</p>
+  <p><b>ขนาดจริง</b> ปุ่ม "จริง 4.0″" หรือ "จริง 3.5″" ปรับให้จอบนหน้านี้กว้างเท่าจอจริงโดยประมาณ (4.0″ = 84 มม., 3.5″ = 73 มม., ปุ่มสุดท้ายมีกรอบบอร์ดประกอบ) (ต้องซูมเบราว์เซอร์ที่ 100%) ใช้ลองยืนมองจากตำแหน่งเล่นจริงว่าอ่านออกไหม</p>
+  <p><b>บล็อกที่แสดง</b> ติ๊กเองได้ ค่าเริ่มต้นคือ Level 1 (A, B ก่อนแอมป์ และ DLY, REV หลังแอมป์) (บล็อกที่ไม่มีเอฟเฟคจะขึ้นเป็นกรอบเส้นประว่างๆ) ถ้าเครื่องคุณ (Level 1) แสดงบล็อกไม่ตรงกับที่คาด ลองติ๊กเปลี่ยนแล้วบอกผมว่าบล็อกไหนตอบกลับ</p>
+  <p id="diag"></p>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const HEADER = [0xF0, 0x00, 0x20, 0x33, 0x02, 0x7F];
+const sysex = (fn, ...rest) => [...HEADER, fn, ...rest, 0xF7];
+
+// Effect type ids from Kemper's MIDI Parameter Documentation: [id, name, icon category]
+const TYPES = [
+  [1,'Wah Wah','wah'],[2,'Wah Low Pass','wah'],[3,'Wah High Pass','wah'],[4,'Wah Vowel Filter','wah'],
+  [6,'Wah Phaser','phaser'],[7,'Wah Flanger','flanger'],[8,'Wah Rate Reducer','mod'],[9,'Wah Ring Modulator','mod'],
+  [10,'Wah Freq Shifter','mod'],[11,'Pedal Pitch','pitch'],[12,'Wah Formant Shifter','wah'],[13,'Pedal Vinyl Stop','other'],
+  [17,'Bit Shaper','drive'],[18,'Octa Shaper','drive'],[19,'Soft Shaper','drive'],[20,'Hard Shaper','drive'],[21,'Wave Shaper','drive'],
+  [32,'Kemper Drive','drive'],[33,'Green Scream','drive'],[34,'Plus DS','drive'],[35,'One DS','drive'],[36,'Muffin','drive'],
+  [37,'Mouse','drive'],[38,'Kemper Fuzz','drive'],[39,'Metal DS','drive'],[42,'Full OC','drive'],
+  [49,'Compressor','comp'],[50,'Auto Swell','comp'],[57,'Noise Gate 2:1','gate'],[58,'Noise Gate 4:1','gate'],
+  [64,'Space','chorus'],[65,'Vintage Chorus','chorus'],[66,'Hyper Chorus','chorus'],[67,'Air Chorus','chorus'],
+  [68,'Vibrato','mod'],[69,'Rotary Speaker','mod'],[70,'Tremolo','mod'],[71,'Micro Pitch','chorus'],
+  [81,'Phaser','phaser'],[82,'Phaser Vibe','phaser'],[83,'Phaser Oneway','phaser'],
+  [89,'Flanger','flanger'],[91,'Flanger Oneway','flanger'],
+  [97,'Graphic Equalizer','eq'],[98,'Studio Equalizer','eq'],[99,'Metal Equalizer','eq'],[100,'Acoustic Simulator','eq'],
+  [101,'Stereo Widener','chorus'],[102,'Phase Widener','chorus'],[103,'Delay Widener','chorus'],[104,'Double Tracker','chorus'],
+  [113,'Treble Booster','drive'],[114,'Lead Booster','drive'],[115,'Pure Booster','drive'],[116,'Wah Pedal Booster','drive'],
+  [121,'Loop Mono','other'],[122,'Loop Stereo','other'],[123,'Loop Distortion','other'],
+  [129,'Transpose','pitch'],[130,'Chromatic Pitch','pitch'],[131,'Harmonic Pitch','pitch'],[132,'Analog Octaver','pitch'],
+  [137,'Dual Chromatic','pitch'],[138,'Dual Harmonic','pitch'],[139,'Dual Crystal','pitch'],[140,'Dual Loop Pitch','pitch'],
+  [145,'Legacy Delay','delay'],[146,'Single Delay','delay'],[147,'Dual Delay','delay'],[148,'Two Tap Delay','delay'],
+  [149,'Serial TwoTap Delay','delay'],[150,'Crystal Delay','delay'],[151,'Loop Pitch Delay','delay'],[152,'Freq Shifter Delay','delay'],
+  [161,'Rhythm Delay','delay'],[162,'Melody Chromatic','delay'],[163,'Melody Harmonic','delay'],[164,'Quad Delay','delay'],
+  [165,'Quad Chromatic','delay'],[166,'Quad Harmonic','delay'],
+  [177,'Legacy Reverb','reverb'],[178,'Natural Reverb','reverb'],[179,'Easy Reverb','reverb'],[180,'Echo Reverb','reverb'],
+  [181,'Cirrus Reverb','reverb'],[182,'Formant Reverb','reverb'],[183,'Ionosphere Reverb','reverb'],[193,'Spring Reverb','reverb']
+];
+const TYPE_BY_ID = new Map(TYPES.map(([id, name, cat]) => [id, { name, cat }]));
+const ICON_PATHS = {
+  drive: 'M2 14 L7 6 H12 L16 22 H21 L26 14',
+  comp: 'M14 3 V10 M10 7 L14 11 L18 7 M14 25 V18 M10 21 L14 17 L18 21 M5 14 H23',
+  wah: 'M2 23 C8 23 8 5 14 5 C20 5 20 23 26 23',
+  phaser: 'M2 12 C6 4 10 4 14 12 S22 20 26 12 M2 16 C6 24 10 24 14 16 S22 8 26 16',
+  chorus: 'M2 12 C6 4 10 4 14 12 S22 20 26 12 M2 17 C6 9 10 9 14 17 S22 25 26 17',
+  flanger: 'M4 23 V11 M9 23 V5 M14 23 V15 M19 23 V7 M24 23 V13',
+  delay: 'M5 4 V24 M11 8 V20 M17 11 V17 M23 13 V15',
+  reverb: 'M8 9 A7 7 0 0 1 8 19 M13 5 A12 12 0 0 1 13 23 M18 2 A16 16 0 0 1 18 26',
+  pitch: 'M14 24 V6 M8 12 L14 6 L20 12',
+  eq: 'M6 4 V24 M14 4 V24 M22 4 V24 M3 10 H9 M11 17 H17 M19 8 H25',
+  gate: 'M2 22 H8 V8 H14 V22 H20 V8 H26',
+  mod: 'M2 14 C6 4 10 4 14 14 S22 24 26 14',
+  other: 'M14 14 m-8 0 a8 8 0 1 0 16 0 a8 8 0 1 0 -16 0'
+};
+const iconSvg = (cat) => `<svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICON_PATHS[cat] || ICON_PATHS.other}"/></svg>`;
+
+// Effect module pages: pre amp A to D, post amp X, MOD, DLY, REV (type = address 0, on/off = address 3)
+const BLOCKS = [
+  { key: 'A', page: 0x32, post: false }, { key: 'B', page: 0x33, post: false },
+  { key: 'C', page: 0x34, post: false }, { key: 'D', page: 0x35, post: false },
+  { key: 'X', page: 0x38, post: true }, { key: 'MOD', page: 0x3A, post: true },
+  { key: 'DLY', page: 0x3C, post: true }, { key: 'REV', page: 0x3D, post: true }
+];
+const st = new Map(BLOCKS.map((b) => [b.page, { type: null, on: null, show: null }]));
+let rigName = '', bpmRaw = null;
+// Level 1 shows 4 blocks: A and B before the amp, DLY and REV after it (my best reading of the Player docs; tick other boxes if your unit differs)
+for (const b of BLOCKS) st.get(b.page).show = ['A', 'B', 'DLY', 'REV'].includes(b.key);
+let access = null, input = null, output = null;
+
+// ---------- drawing ----------
+function visible(b) {
+  const s = st.get(b.page);
+  if (s.show !== null) return s.show;
+  return s.type !== null;                 // an empty block (type 0) is still shown, as a dashed placeholder
+}
+function chipHtml(b) {
+  const s = st.get(b.page);
+  const t = TYPE_BY_ID.get(s.type);
+  const empty = s.type === 0 || s.type === null;
+  const name = empty ? 'ว่าง' : (t ? t.name : 'Type ' + s.type);
+  return `<div class="chip ${s.on ? 'on' : ''} ${empty ? 'empty' : ''}">${iconSvg(t ? t.cat : 'other')}<div class="n">${name}</div></div>`;
+}
+function draw() {
+  const pre = BLOCKS.filter((b) => !b.post && visible(b));
+  const post = BLOCKS.filter((b) => b.post && visible(b));
+  const fx = $('fx');
+  fx.className = Math.max(pre.length, post.length) > 2 ? 'small' : '';
+  if (!pre.length && !post.length) {
+    fx.innerHTML = '<div class="wait">รอข้อมูลบล็อกจากเครื่อง</div>';
+  } else {
+    fx.innerHTML =
+      (pre.length ? `<div class="frow">${pre.map(chipHtml).join('')}</div>` : '') +
+      '<div class="amp">AMP<small>CAB</small></div>' +
+      (post.length ? `<div class="frow">${post.map(chipHtml).join('')}</div>` : '');
+  }
+  $('name').textContent = rigName || '...';
+  fitName();
+  $('bpm').textContent = bpmRaw === null ? '...' : (bpmRaw / 64).toFixed(1);
+  const answered = BLOCKS.filter((b) => st.get(b.page).type !== null).map((b) => `${b.key}=${st.get(b.page).type}`);
+  $('diag').textContent = answered.length ? 'เครื่องตอบกลับบล็อก (รหัสชนิดเอฟเฟค): ' + answered.join('  ') : '';
+}
+function fitName() {
+  const el = $('name');
+  let size = 58;
+  el.style.fontSize = size + 'px';
+  while (el.scrollWidth > el.clientWidth + 1 && size > 24) { size -= 2; el.style.fontSize = size + 'px'; }
+}
+let rafPending = false;
+function redraw() { if (rafPending) return; rafPending = true; requestAnimationFrame(() => { rafPending = false; draw(); }); }
+
+// block checkboxes
+for (const b of BLOCKS) {
+  const l = document.createElement('label');
+  l.innerHTML = `<input type="checkbox" data-p="${b.page}"> ${b.key}`;
+  $('blockChecks').appendChild(l);
+}
+function syncChecks() {
+  document.querySelectorAll('#blockChecks input').forEach((c) => {
+    const b = BLOCKS.find((x) => x.page === +c.dataset.p);
+    c.checked = visible(b);
+  });
+}
+$('blockChecks').addEventListener('change', (e) => {
+  const b = BLOCKS.find((x) => x.page === +e.target.dataset.p);
+  st.get(b.page).show = e.target.checked;
+  draw();
+});
+
+// ---------- scaling ----------
+let scaleMode = 'fit', scaleVal = 1, showBoard = false;
+// real-size board outline: 101.5 x 54.5 mm PCB, 3.5 inch screen (73.4 x 48.9 mm) inside
+function drawBoard(s) {
+  let b = document.getElementById('boardFrame');
+  if (!showBoard) { if (b) b.remove(); return; }
+  const mm = (480 * s) / 73.4;                 // px per mm at the current scale
+  const d = $('device').getBoundingClientRect();
+  if (!b) { b = document.createElement('div'); b.id = 'boardFrame'; b.style.cssText = 'position:fixed;pointer-events:none;border:2px dashed #FFB020;border-radius:6px;color:#FFB020;font:12px sans-serif;z-index:5'; document.body.appendChild(b); }
+  const w = 101.5 * mm, h = 54.5 * mm, cx = d.left + d.width / 2, cy = d.top + d.height / 2;
+  b.style.width = w + 'px'; b.style.height = h + 'px'; b.style.left = (cx - w / 2) + 'px'; b.style.top = (cy - h / 2) + 'px';
+  b.textContent = 'บอร์ด 101.5 × 54.5 มม.';
+}
+function applyScale() {
+  let s = scaleVal;
+  if (scaleMode === 'fit') s = Math.max(0.4, Math.min((window.innerWidth - 60) / 480, (window.innerHeight - 170) / 320, 2.2));
+  $('device').style.transform = `scale(${s})`;
+  drawBoard(s);
+  $('stage').style.width = 480 * s + 'px';
+  $('stage').style.height = 320 * s + 'px';
+}
+$('sFit').onclick = () => { scaleMode = 'fit'; showBoard = false; applyScale(); };
+$('s1').onclick = () => { scaleMode = 'fixed'; scaleVal = 1; showBoard = false; applyScale(); };
+$('sReal').onclick = () => { scaleMode = 'fixed'; scaleVal = (84.5 / 25.4 * 96) / 480; showBoard = false; applyScale(); };
+$('sReal35').onclick = () => { scaleMode = 'fixed'; scaleVal = (73.4 / 25.4 * 96) / 480; showBoard = false; applyScale(); };
+$('sBoard').onclick = () => { scaleMode = 'fixed'; scaleVal = (73.4 / 25.4 * 96) / 480; showBoard = true; applyScale(); };
+window.addEventListener('resize', applyScale);
+
+// ---------- tap overlay ----------
+let tapTimer = null;
+function showTap(text) {
+  $('tapNum').textContent = text;
+  $('tap').classList.add('show');
+  const f = $('tapFill');
+  f.style.transition = 'none'; f.style.transform = 'scaleX(1)';
+  void f.offsetWidth;
+  f.style.transition = 'transform 3s linear'; f.style.transform = 'scaleX(0)';
+  clearTimeout(tapTimer);
+  tapTimer = setTimeout(() => $('tap').classList.remove('show'), 3000);
+}
+$('tapBtn').onclick = () => showTap((90 + Math.random() * 120).toFixed(1));
+window.addEventListener('keydown', (e) => {
+  if (e.key === 't' || e.key === 'T') $('tapBtn').click();
+  if (e.key === 'u' || e.key === 'U') $('tnBtn').click();
+});
+
+// ---------- tempo: tap detection ----------
+let lastTempoVal = null, pendingTap = null, lastNameChangeAt = 0;
+function watchTempo(v) {
+  if (lastTempoVal !== null && v !== lastTempoVal && performance.now() - lastNameChangeAt < 700) { lastTempoVal = v; return; }
+  if (lastTempoVal !== null && v !== lastTempoVal && !pendingTap) {
+    pendingTap = { rig: rigName };
+    send(sysex(0x43, 0x00, 0x00, 0x01));
+    const mine = pendingTap;
+    setTimeout(() => { if (pendingTap === mine) pendingTap = null; }, 700);
+  }
+  lastTempoVal = v;
+  if ($('tap').classList.contains('show')) $('tapNum').textContent = (v / 64).toFixed(1);
+}
+function resolveTap(newName) {
+  const t = pendingTap;
+  if (!t) return;
+  pendingTap = null;
+  if (newName !== t.rig) return;           // rig changed, so this tempo change came from a preset change
+  showTap(bpmRaw === null ? '...' : (bpmRaw / 64).toFixed(1));
+}
+
+// ---------- MIDI ----------
+function setStatus(t, k) { const e = $('status'); e.textContent = t; e.className = k || ''; }
+function send(bytes) {
+  if (!output) return false;
+  try { output.send(bytes); } catch (e) { return false; }
+  return true;
+}
+const ascii = (bytes) => { let s = ''; for (const b of bytes) { if (b === 0) break; s += String.fromCharCode(b); } return s; };
+
+function onMessage(e) {
+  const d = e.data;
+  if (d[0] !== 0xF0 || d[1] !== 0x00 || d[2] !== 0x20 || d[3] !== 0x33) return;
+  const fn = d[6];
+  if (fn === 0x03 && d[8] === 0x00 && d[9] === 0x01) {
+    const s = ascii(d.slice(10, d.length - 1)) || '(ว่าง)';
+    if (s !== rigName) {
+      const first = rigName === '';
+      rigName = s;
+      if (!first) { clearTimeout(tapTimer); pendingTap = null; $('tap').classList.remove('show'); }   // rig changed: close the tap box at once
+      if (!first) { lastNameChangeAt = performance.now(); pollQueue.length = 0; pollQueue.push(...fullQueue()); }
+      redraw();
+    }
+    resolveTap(rigName);
+    return;
+  }
+  if (fn === 0x01 && d.length >= 13) {
+    const page = d[8], addr = d[9], v = (d[10] << 7) | d[11];
+    if (page === 0x04 && addr === 0x00) {
+      bpmRaw = v; watchTempo(v); redraw(); return;
+    }
+    const s = st.get(page);
+    if (!s) return;
+    if (addr === 0x00) { s.type = v; if (s.show === null) syncChecks(); redraw(); }
+    else if (addr === 0x03) { s.on = v === 1; redraw(); }
+  }
+}
+
+function fillPorts() {
+  const keepIn = $('inPort').value, keepOut = $('outPort').value;
+  const make = (sel, ports, keep) => {
+    sel.innerHTML = '';
+    if (ports.size === 0) { sel.innerHTML = '<option value="">ไม่พบพอร์ต</option>'; return; }
+    let pick = '';
+    ports.forEach((p) => {
+      const o = document.createElement('option');
+      o.value = p.id; o.textContent = p.name || p.id; sel.appendChild(o);
+      if (!pick && /kemper|profiler|player/i.test(p.name || '')) pick = p.id;
+    });
+    sel.value = keep && ports.has(keep) ? keep : (pick || ports.values().next().value.id);
+  };
+  make($('inPort'), access.inputs, keepIn);
+  make($('outPort'), access.outputs, keepOut);
+  bindPorts();
+}
+function bindPorts() {
+  if (input) input.onmidimessage = null;
+  input = access.inputs.get($('inPort').value) || null;
+  output = access.outputs.get($('outPort').value) || null;
+  if (input) input.onmidimessage = onMessage;
+  if (input && output) {
+    setStatus(`เชื่อมแล้ว ${input.name}`, 'ok');
+    pollQueue.length = 0; pollQueue.push(...fullQueue());
+    send(sysex(0x43, 0x00, 0x00, 0x01));
+  } else {
+    setStatus('ยังไม่พบพอร์ต MIDI เสียบสาย USB แล้วลองใหม่ หรือปิด Rig Manager ก่อน', 'err');
+  }
+}
+async function connect() {
+  if (!navigator.requestMIDIAccess) { setStatus('ใช้ Chrome หรือ Edge เปิดไฟล์นี้', 'err'); return; }
+  try { access = await navigator.requestMIDIAccess({ sysex: true }); }
+  catch (e) { setStatus('ไม่ได้รับอนุญาตใช้ MIDI/SysEx: ' + e.message, 'err'); return; }
+  access.onstatechange = fillPorts;
+  fillPorts();
+}
+$('connect').onclick = connect;
+$('inPort').onchange = bindPorts;
+$('outPort').onchange = bindPorts;
+
+// ---------- polling (the Kemper never pushes changes, so ask in a loop) ----------
+let pollQueue = [], pollStepN = 0, pollTimer = null;
+function fullQueue() {
+  const q = [sysex(0x41, 0x00, 0x04, 0x00)];
+  for (const b of BLOCKS) { q.push(sysex(0x41, 0x00, b.page, 0x03)); q.push(sysex(0x41, 0x00, b.page, 0x00)); }
+  return q;
+}
+function pollStep() {
+  if (!output) return;
+  pollStepN++;
+  if (pollStepN % 4 === 0) { send(sysex(0x43, 0x00, 0x00, 0x01)); return; }
+  if (pollQueue.length === 0) pollQueue.push(...fullQueue());
+  send(pollQueue.shift());
+}
+function setSpeed(ms) { clearInterval(pollTimer); pollTimer = setInterval(pollStep, ms); }
+$('speed').onchange = () => setSpeed(+$('speed').value);
+setSpeed(+$('speed').value);
+setInterval(() => { if (output) send(sysex(0x41, 0x00, 0x04, 0x00)); }, 90);
+
+
+
+$('presetL1').onclick = () => { for (const b of BLOCKS) st.get(b.page).show = ['A', 'B', 'DLY', 'REV'].includes(b.key); syncChecks(); draw(); };
+$('presetAll').onclick = () => { for (const b of BLOCKS) st.get(b.page).show = st.get(b.page).type !== null; syncChecks(); draw(); };
+syncChecks();
+applyScale();
+
+// ---------- tuner screen (simulated input for now: note + cents come from the controls below) ----------
+const tn = { on: false, offs: [0, 0, 0] };
+const NOTES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+for (const [n, o] of [['E', 2], ['A', 2], ['D', 3], ['G', 3], ['B', 3], ['E', 4]]) { const op = document.createElement('option'); op.value = n + o; op.textContent = n + o; $('tnNoteSel').appendChild(op); }
+(function buildTicks() {
+  const box = $('tnMeter');
+  for (let c = -50; c <= 50; c += 5) { const t = document.createElement('i'); const big = c % 10 === 0; t.style.left = (50 + c) + '%'; t.style.top = (big ? 4 : 16) + 'px'; t.style.height = (big ? 30 : 18) + 'px'; if (c === 0) t.style.background = '#F2F4F7'; box.insertBefore(t, $('tnNeedle')); }
+})();
+function tnState() { const v = $('tnNoteSel').value; return { note: v.slice(0, -1), oct: v.slice(-1), cents: +$('tnCents').value }; }
+function drawTuner() {
+  const { note, oct, cents } = tnState();
+  const ok = Math.abs(cents) <= 3, col = ok ? '#3DDC97' : '#FFB020';
+  const txt = ok ? 'IN TUNE' : (cents > 0 ? '+' : '-') + Math.abs(cents) + ' cent';
+  $('tuner').classList.toggle('ok', ok);
+  const strobe = $('tnMode').value === 'strobe';
+  $('tnChrom').style.display = strobe ? 'none' : 'flex'; $('tnStr').style.display = strobe ? 'flex' : 'none';
+  $('tnNote').textContent = note; $('tnOct').textContent = oct; $('tnNote').style.color = col;
+  $('tnNote2').textContent = note; $('tnOct2').textContent = oct; $('tnNote2').style.color = col;
+  $('tnTxt').textContent = txt; $('tnTxt').style.color = col; $('tnTxt2').textContent = txt; $('tnTxt2').style.color = col;
+  $('tnL').style.borderRightColor = cents < -3 ? '#FFB020' : '#262B33'; $('tnR').style.borderLeftColor = cents > 3 ? '#FFB020' : '#262B33';
+  $('tnFl').style.color = cents < -3 ? '#FFB020' : '#3A414B'; $('tnSh').style.color = cents > 3 ? '#FFB020' : '#3A414B';
+  $('tnNeedle').style.left = (50 + cents) + '%'; $('tnNeedle').style.background = col;
+  [...$('tnRows').children].forEach((r, i) => { r.style.backgroundImage = `repeating-linear-gradient(90deg,${col} 0 22px,transparent 22px 44px)`; r.style.opacity = [1, 0.85, 0.7][i]; });
+}
+let tnLast = 0;
+function tnFrame(t) {
+  if (tn.on) {
+    const dt = Math.min(0.05, (t - tnLast) / 1000); tnLast = t;
+    if ($('tnWob').checked) { const c = Math.round(Math.sin(t / 900) * 30 * Math.sin(t / 5000 + 1)); if (c !== +$('tnCents').value) { $('tnCents').value = c; drawTuner(); } }
+    const c = +$('tnCents').value, ok = Math.abs(c) <= 3;
+    [...$('tnRows').children].forEach((r, i) => { tn.offs[i] += (ok ? 0 : c * (1 + i * 0.9) * 3) * dt; r.style.backgroundPosition = tn.offs[i] + 'px 0'; });
+  }
+  requestAnimationFrame(tnFrame);
+}
+requestAnimationFrame(tnFrame);
+function setTuner(v) { tn.on = v; $('tuner').classList.toggle('show', v); if (v) { if (tapTimer) clearTimeout(tapTimer); $('tap').classList.remove('show'); drawTuner(); } }
+$('tnBtn').onclick = () => setTuner(!tn.on);
+for (const id of ['tnMode', 'tnNoteSel', 'tnCents']) $(id).oninput = drawTuner;
+$('tnMode').onchange = drawTuner;
+draw();
+</script>
+</body>
+</html>

@@ -1,0 +1,719 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kemper Player MIDI test</title>
+<style>
+  :root {
+    --bg: #0B0D10; --panel: #14171C; --line: #262B33; --text: #F2F4F7; --muted: #9AA3AE;
+    --accent: #FFB020; --ok: #3DDC97; --err: #FF6B6B;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, "Noto Sans Thai", sans-serif; }
+  main { max-width: 880px; margin: 0 auto; padding: 24px 16px 64px; display: flex; flex-direction: column; gap: 16px; }
+  h1 { font-size: 22px; margin: 0; }
+  h2 { font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+  p { margin: 0; color: var(--muted); }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+  label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+  select, input { background: #0F1216; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; font: inherit; min-height: 40px; }
+  input.hex { width: 100%; font-family: ui-monospace, Menlo, Consolas, monospace; }
+  input.num { width: 84px; }
+  button { background: #1B1F26; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 9px 14px; font: inherit; font-weight: 600; cursor: pointer; min-height: 40px; }
+  button:hover { border-color: var(--muted); }
+  button.primary { background: var(--accent); color: #1A1200; border-color: var(--accent); }
+  #status { font-size: 14px; }
+  #status.ok { color: var(--ok); } #status.err { color: var(--err); }
+  .live { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+  .card { background: #0F1216; border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  .card .k { font-size: 12px; color: var(--muted); letter-spacing: 0.08em; }
+  .card .v { font-size: 24px; font-weight: 700; margin-top: 2px; min-height: 34px; overflow-wrap: anywhere; }
+  #log { height: 300px; overflow: auto; background: #0F1216; border: 1px solid var(--line); border-radius: 10px; padding: 10px; font: 12.5px/1.6 ui-monospace, Menlo, Consolas, monospace; }
+  #log div { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .in { color: var(--ok); } .out { color: var(--accent); } .sys { color: var(--muted); }
+  .note { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: 0.06em; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  td.ico svg { display: block; color: var(--accent); }
+  .pill { display: inline-block; min-width: 44px; text-align: center; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+  .pill.on { background: var(--ok); color: #04170E; } .pill.off { background: #262B33; color: var(--muted); }
+  .dim { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <div>
+    <h1>Kemper Player MIDI test</h1>
+    <p>เครื่องมือทดสอบว่า Player ตอบอะไรกลับมาบ้าง ใช้ได้กับ Chrome หรือ Edge เท่านั้น</p>
+  </div>
+
+  <section>
+    <h2>1. เชื่อมต่อ</h2>
+    <div class="row">
+      <button class="primary" id="connect">เชื่อมต่อ MIDI</button>
+      <label>พอร์ตรับ (Player ส่งมา)
+        <select id="inPort"><option value="">ยังไม่เชื่อมต่อ</option></select>
+      </label>
+      <label>พอร์ตส่ง (ส่งไป Player)
+        <select id="outPort"><option value="">ยังไม่เชื่อมต่อ</option></select>
+      </label>
+      <label>ช่อง MIDI
+        <select id="chan"></select>
+      </label>
+    </div>
+    <p id="status" class="note">เสียบ USB ระหว่างคอมกับ Player แล้วกดเชื่อมต่อ ถ้าเบราว์เซอร์ถาม ให้กดอนุญาตการใช้ MIDI รวมถึง SysEx ถ้าพอร์ตไม่ขึ้น ลองปิด Rig Manager ก่อน</p>
+  </section>
+
+  <section>
+    <h2>2. ข้อมูลสด</h2>
+    <div class="live">
+      <div class="card"><div class="k">ชื่อ RIG (SysEx)</div><div class="v" id="rigName">ยังไม่มี</div></div>
+      <div class="card"><div class="k">BPM</div><div class="v" id="bpm">ยังไม่มี</div><div class="dim" id="bpmSrc" style="font-size:12px"></div></div>
+      <div class="card"><div class="k">ข้อความที่รับ</div><div class="v" id="count">0</div></div>
+    </div>
+    <div id="tapBox" style="margin-top:12px;border:2px solid #FFB020;border-radius:10px;padding:14px 16px;background:#1a1405;color:#FFB020;display:none">
+      <div style="font-weight:800;letter-spacing:.15em;font-size:13px">ตรวจพบ TAP TEMPO</div>
+      <div><span id="tapNew" style="font-size:54px;font-weight:800;color:#fff">0</span> <span style="font-size:16px">BPM</span> <span id="tapOld" class="dim" style="font-size:14px"></span></div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <label>ความเร็วการถามเครื่อง
+        <select id="pollSpeed"><option value="40">ปกติ (ทุก 40 ms)</option><option value="20">เร็ว (ทุก 20 ms)</option><option value="10">เร็วมาก (ทุก 10 ms)</option></select>
+      </label>
+      <div class="dim" style="font-size:13px">เวลาตอบกลับของชื่อ Rig: <span id="rttMs">-</span> · ถามครบทั้งรอบ: <span id="cycleMs">-</span></div>
+    </div>
+    <p class="note" id="tapStat">ทดสอบ Tap Tempo: เหยียบ Tap บนเครื่องหลายๆ ที ถ้าค่า BPM เปลี่ยนโดยชื่อ Rig ยังเหมือนเดิม จะมีกล่องสีเหลืองขึ้น 3 วินาที (ตรวจพบแล้ว 0 ครั้ง)</p>
+    <div class="row" style="margin-top:12px">
+      <button id="reqTempo">อ่าน BPM จากเครื่อง</button>
+      <label style="flex-direction:row; align-items:center; gap:8px"><input type="checkbox" id="autoAll" checked style="min-height:0"> อัปเดตอัตโนมัติ (ชื่อ Rig, บล็อกทั้งหมด, BPM)</label>
+    </div>
+    <p class="note">เมื่อติ๊กไว้ จอจะถามเครื่องวนซ้ำเอง เปลี่ยน Rig หรือกดเปิดปิดเอฟเฟกต์บนเครื่อง แล้วข้อมูลด้านบนจะตามเองภายในไม่ถึงวินาที เครื่องไม่ส่งข้อมูลมาเองตอนเปลี่ยน จึงต้องถามวน BPM คือค่า Tempo ที่ตั้งไว้ใน Rig ไม่ใช่ MIDI clock</p>
+  </section>
+
+  <section>
+    <h2>3. บล็อกเอฟเฟกต์ (อ่านจากเครื่อง)</h2>
+    <div class="row" style="margin-bottom:10px">
+      <button class="primary" id="scan">อ่านบล็อกทั้งหมดจากเครื่อง</button>
+    </div>
+    <table>
+      <thead><tr><th>บล็อก</th><th></th><th>เอฟเฟกต์</th><th>รหัสที่เครื่องส่งมา</th><th>สถานะ</th></tr></thead>
+      <tbody id="blocks"></tbody>
+    </table>
+    <p class="note">เครื่องส่งมาเป็นรหัสชนิดเอฟเฟกต์ (Type) กับสถานะเปิดปิด ส่วนชื่อกับไอคอนผมแปลงจากตารางรหัสในเอกสาร MIDI ของ Kemper เครื่องไม่ได้ส่งรูปมาให้ บล็อกที่เครื่องไม่ตอบ (เช่น C, D, X, MOD ถ้าเป็น Level 1) แปลว่าเครื่องคุณไม่มีบล็อกนั้น</p>
+  </section>
+
+  <section>
+    <h2>4. ทดสอบที่ปลอดภัย</h2>
+    <div class="row">
+      <button id="reqName">ขอชื่อ Rig</button>
+      <button id="reqSlot">ขอชื่อ Slot 1 (extended)</button>
+      <button id="reqAll">ลองทั้งสองอย่าง</button>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <label>Program Change
+        <input class="num" id="pcNum" type="number" min="0" max="127" value="0">
+      </label>
+      <button id="sendPc">ส่ง PC</button>
+      <button id="stompOn">Stomp A เปิด (CC 17 = 127)</button>
+      <button id="stompOff">Stomp A ปิด (CC 17 = 0)</button>
+    </div>
+    <p class="note">ปุ่ม Program Change กับ Stomp A ใช้เช็กว่าฝั่งส่งทำงานไหม ถ้า Player เปลี่ยน Rig หรือเปิดปิดเอฟเฟกต์ A แปลว่าส่งเข้าได้</p>
+  </section>
+
+  <section>
+    <h2>5. ทดลองเอง (ขั้นสูง)</h2>
+    <div class="row">
+      <label>Page (ฐานสิบหก)
+        <input class="num" id="page" value="00">
+      </label>
+      <label>Address (ฐานสิบหก)
+        <input class="num" id="addr" value="01">
+      </label>
+      <button id="reqParam">ขอค่าพารามิเตอร์เดี่ยว (0x41)</button>
+    </div>
+    <p class="note">รูปแบบข้อความตรงกับ MIDI Parameter Documentation ของ Kemper ส่วนผลกับ Player ยังต้องดูจากของจริง เช่น Page 32 Address 00 คือชนิดเอฟเฟกต์ของบล็อก A และ Address 03 คือเปิดปิด</p>
+    <div class="row" style="margin-top:12px; align-items:end">
+      <label style="flex:1; min-width:260px">ส่ง SysEx ดิบ (ฐานสิบหก คั่นด้วยเว้นวรรค)
+        <input class="hex" id="raw" value="F0 00 20 33 02 7F 43 00 00 01 F7">
+      </label>
+      <button id="sendRaw">ส่ง</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>7. สแกนเทียบความต่าง (ใช้หาค่าชื่อโน้ต Tuner ด้วย)</h2>
+    <p class="note">เอกสาร Kemper ไม่ได้บอกว่าอ่านสถานะ Morph ได้ จึงต้องทดลอง วิธีนี้ถามค่าทุกพารามิเตอร์ที่เครื่องตอบ แล้วเทียบตอน Morph ปิดกับเปิด ถ้ามีค่าไหนเปลี่ยนตามปุ่ม Morph จะเห็นในตารางผลต่าง แต่ละรอบใช้เวลาราว 1 ถึง 2 นาที ระหว่างสแกนอย่ากดอะไรบนเครื่อง นอกจากตอนที่บอกให้กด</p>
+    <div class="row">
+      <label>Page เริ่ม (hex) <input class="num" id="scanFrom" value="7C"></label>
+      <label>Page จบ (hex) <input class="num" id="scanTo" value="7F"></label>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="scan1">สแกนที่ 1 (โน้ตที่ 1)</button>
+      <button id="scan2">สแกนที่ 2 (โน้ตที่ 2)</button>
+      <button id="scan3">สแกนที่ 3 (โน้ตที่ 1 อีกครั้ง)</button>
+      <button class="primary" id="scanDiff">แสดงผลต่าง</button>
+      <button id="scanStop">หยุด</button>
+    </div>
+    <p class="note" id="scanInfo">ขั้นตอน: 1) ตั้งให้ Morph ปิด กดสแกนที่ 1 2) กดปุ่ม Morph บนเครื่องให้เปิดค้างไว้ กดสแกนที่ 2 3) กดปุ่ม Morph ปิดอีกครั้ง กดสแกนที่ 3 (ใช้กรองค่าที่เปลี่ยนเองโดยไม่เกี่ยวกับ Morph) แล้วกดแสดงผลต่าง</p>
+    <div id="scanOut" style="max-height:340px;overflow:auto"></div>
+  </section>
+
+  <section>
+    <h2>8. หาค่า Tuner (ดูว่าเครื่องส่งโน้ตกับ cent ออกมาไหม)</h2>
+    <p class="note">วิธีใช้: 1) กด "เปิด Tuner" หรือเปิดบนเครื่องเอง 2) เล่นโน้ตค้างไว้ แล้วขยับสายให้เพี้ยนขึ้นลงเล็กน้อย 3) กด "ตรวจ" ตัวนี้จะถามค่าซ้ำหลายรอบ แล้วรายงานว่าค่าไหนเปลี่ยนไปมาตามเสียง และมีข้อความอะไรที่เครื่องส่งมาเองหรือเปล่า</p>
+    <div class="row">
+      <label>Page เริ่ม (hex) <input class="num" id="tnFrom" value="7C"></label>
+      <label>Page จบ (hex) <input class="num" id="tnTo" value="7F"></label>
+      <label>จำนวนรอบ <input class="num" id="tnRounds" value="8"></label>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="tnOn">เปิด Tuner (CC 31 = 1)</button>
+      <button id="tnOff">ปิด Tuner (CC 31 = 0)</button>
+      <button class="primary" id="tnRun">ตรวจ</button>
+      <button id="tnStop">หยุด</button>
+    </div>
+    <p class="note" id="tnInfo">ถ้าช่วง 7C ถึง 7F ไม่เจออะไร ลองเปลี่ยนเป็น 00 ถึง 7F (ช้าลง ราว 1 นาทีต่อรอบ ลดรอบเหลือ 3)</p>
+    <div id="tnOut" style="max-height:340px;overflow:auto"></div>
+  </section>
+
+  <section>
+    <h2>9. ดูค่า Tuner สด (ตามผลที่ได้จากหัวข้อ 8)</h2>
+    <p class="note">ผลตรวจพบว่า 7D:54 แกว่งรอบ 63 (น่าจะเป็นความเพี้ยน) และ 7C:4E ถึง 7C:53 เปลี่ยนตามเสียง กดเริ่มแล้วเล่นสายเปล่าทีละสาย (E A D G B E) ค้างไว้สักครู่ต่อสาย แล้วลองดีดให้สูงขึ้นหรือต่ำลงหน่อย ตารางจะโชว์ค่าปัจจุบัน ต่ำสุด สูงสุด ของ page 7D ช่วง 48 ถึง 5F และ 7C ช่วง 4E ถึง 53</p>
+    <div class="row"><button class="primary" id="lvOn">เริ่มดูสด</button><button id="lvOff">หยุด</button><button id="lvMark">จดโน้ตที่เล่นอยู่</button><input id="lvNote" placeholder="เช่น E2" style="width:80px"></div>
+    <div id="lvOut" style="max-height:360px;overflow:auto"></div>
+  </section>
+
+  <section>
+    <h2>6. บันทึก</h2>
+    <div class="row" style="margin-bottom:10px">
+      <button id="copyLog">คัดลอกบันทึกทั้งหมด</button>
+      <button id="clearLog">ล้าง</button>
+    </div>
+    <div id="log" aria-live="polite"></div>
+    <p class="note">ถ้าบางอย่างไม่ตอบ กดคัดลอกบันทึกแล้วส่งกลับมาให้ผมดูได้เลย</p>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const HEADER = [0xF0, 0x00, 0x20, 0x33, 0x02, 0x7F];   // Kemper manufacturer id, product type, omni device id
+let access = null, input = null, output = null;
+let received = 0;
+const logLines = [];
+const clockTimes = [];
+let lastClockAt = 0;
+
+for (let i = 1; i <= 16; i++) {
+  const o = document.createElement('option');
+  o.value = String(i - 1); o.textContent = String(i);
+  $('chan').appendChild(o);
+}
+
+const hex = (a) => Array.from(a, (b) => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+const sysex = (fn, ...rest) => [...HEADER, fn, ...rest, 0xF7];
+const ch = () => parseInt($('chan').value, 10) || 0;
+
+function setStatus(text, kind) {
+  const el = $('status');
+  el.textContent = text;
+  el.className = 'note' + (kind ? ' ' + kind : '');
+  el.id = 'status';
+}
+
+function log(kind, text) {
+  const t = new Date().toLocaleTimeString('en-GB');
+  const line = `${t}  ${kind === 'in' ? 'รับ' : kind === 'out' ? 'ส่ง' : '   '}  ${text}`;
+  logLines.push(line);
+  if (logLines.length > 1000) logLines.shift();
+  const d = document.createElement('div');
+  d.className = kind;
+  d.textContent = line;
+  const box = $('log');
+  box.appendChild(d);
+  while (box.children.length > 400) box.removeChild(box.firstChild);
+  box.scrollTop = box.scrollHeight;
+}
+
+function ascii(bytes) {
+  let s = '';
+  for (const b of bytes) { if (b === 0) break; s += String.fromCharCode(b); }
+  return s;
+}
+
+// Effect type ids from Kemper's MIDI Parameter Documentation: [id, name, icon category]
+const TYPES = [
+  [1,'Wah Wah','wah'],[2,'Wah Low Pass','wah'],[3,'Wah High Pass','wah'],[4,'Wah Vowel Filter','wah'],
+  [6,'Wah Phaser','phaser'],[7,'Wah Flanger','flanger'],[8,'Wah Rate Reducer','mod'],[9,'Wah Ring Modulator','mod'],
+  [10,'Wah Freq Shifter','mod'],[11,'Pedal Pitch','pitch'],[12,'Wah Formant Shifter','wah'],[13,'Pedal Vinyl Stop','other'],
+  [17,'Bit Shaper','drive'],[18,'Octa Shaper','drive'],[19,'Soft Shaper','drive'],[20,'Hard Shaper','drive'],[21,'Wave Shaper','drive'],
+  [32,'Kemper Drive','drive'],[33,'Green Scream','drive'],[34,'Plus DS','drive'],[35,'One DS','drive'],[36,'Muffin','drive'],
+  [37,'Mouse','drive'],[38,'Kemper Fuzz','drive'],[39,'Metal DS','drive'],[42,'Full OC','drive'],
+  [49,'Compressor','comp'],[50,'Auto Swell','comp'],[57,'Noise Gate 2:1','gate'],[58,'Noise Gate 4:1','gate'],
+  [64,'Space','chorus'],[65,'Vintage Chorus','chorus'],[66,'Hyper Chorus','chorus'],[67,'Air Chorus','chorus'],
+  [68,'Vibrato','mod'],[69,'Rotary Speaker','mod'],[70,'Tremolo','mod'],[71,'Micro Pitch','chorus'],
+  [81,'Phaser','phaser'],[82,'Phaser Vibe','phaser'],[83,'Phaser Oneway','phaser'],
+  [89,'Flanger','flanger'],[91,'Flanger Oneway','flanger'],
+  [97,'Graphic Equalizer','eq'],[98,'Studio Equalizer','eq'],[99,'Metal Equalizer','eq'],[100,'Acoustic Simulator','eq'],
+  [101,'Stereo Widener','chorus'],[102,'Phase Widener','chorus'],[103,'Delay Widener','chorus'],[104,'Double Tracker','chorus'],
+  [113,'Treble Booster','drive'],[114,'Lead Booster','drive'],[115,'Pure Booster','drive'],[116,'Wah Pedal Booster','drive'],
+  [121,'Loop Mono','other'],[122,'Loop Stereo','other'],[123,'Loop Distortion','other'],
+  [129,'Transpose','pitch'],[130,'Chromatic Pitch','pitch'],[131,'Harmonic Pitch','pitch'],[132,'Analog Octaver','pitch'],
+  [137,'Dual Chromatic','pitch'],[138,'Dual Harmonic','pitch'],[139,'Dual Crystal','pitch'],[140,'Dual Loop Pitch','pitch'],
+  [145,'Legacy Delay','delay'],[146,'Single Delay','delay'],[147,'Dual Delay','delay'],[148,'Two Tap Delay','delay'],
+  [149,'Serial TwoTap Delay','delay'],[150,'Crystal Delay','delay'],[151,'Loop Pitch Delay','delay'],[152,'Freq Shifter Delay','delay'],
+  [161,'Rhythm Delay','delay'],[162,'Melody Chromatic','delay'],[163,'Melody Harmonic','delay'],[164,'Quad Delay','delay'],
+  [165,'Quad Chromatic','delay'],[166,'Quad Harmonic','delay'],
+  [177,'Legacy Reverb','reverb'],[178,'Natural Reverb','reverb'],[179,'Easy Reverb','reverb'],[180,'Echo Reverb','reverb'],
+  [181,'Cirrus Reverb','reverb'],[182,'Formant Reverb','reverb'],[183,'Ionosphere Reverb','reverb'],[193,'Spring Reverb','reverb']
+];
+const TYPE_BY_ID = new Map(TYPES.map(([id, name, cat]) => [id, { name, cat }]));
+const ICON_PATHS = {
+  drive: 'M2 14 L7 6 H12 L16 22 H21 L26 14',
+  comp: 'M14 3 V10 M10 7 L14 11 L18 7 M14 25 V18 M10 21 L14 17 L18 21 M5 14 H23',
+  wah: 'M2 23 C8 23 8 5 14 5 C20 5 20 23 26 23',
+  phaser: 'M2 12 C6 4 10 4 14 12 S22 20 26 12 M2 16 C6 24 10 24 14 16 S22 8 26 16',
+  chorus: 'M2 12 C6 4 10 4 14 12 S22 20 26 12 M2 17 C6 9 10 9 14 17 S22 25 26 17',
+  flanger: 'M4 23 V11 M9 23 V5 M14 23 V15 M19 23 V7 M24 23 V13',
+  delay: 'M5 4 V24 M11 8 V20 M17 11 V17 M23 13 V15',
+  reverb: 'M8 9 A7 7 0 0 1 8 19 M13 5 A12 12 0 0 1 13 23 M18 2 A16 16 0 0 1 18 26',
+  pitch: 'M14 24 V6 M8 12 L14 6 L20 12',
+  eq: 'M6 4 V24 M14 4 V24 M22 4 V24 M3 10 H9 M11 17 H17 M19 8 H25',
+  gate: 'M2 22 H8 V8 H14 V22 H20 V8 H26',
+  mod: 'M2 14 C6 4 10 4 14 14 S22 24 26 14',
+  other: 'M14 14 m-8 0 a8 8 0 1 0 16 0 a8 8 0 1 0 -16 0'
+};
+const iconSvg = (cat) =>
+  `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICON_PATHS[cat] || ICON_PATHS.other}"/></svg>`;
+
+// Effect module address pages from the same documentation (Type = address 0, On/Off = address 3)
+const BLOCKS = [
+  { key: 'A', page: 0x32 }, { key: 'B', page: 0x33 }, { key: 'C', page: 0x34 }, { key: 'D', page: 0x35 },
+  { key: 'X', page: 0x38 }, { key: 'MOD', page: 0x3A }, { key: 'DLY', page: 0x3C }, { key: 'REV', page: 0x3D }
+];
+const blockState = new Map(BLOCKS.map((b) => [b.page, { type: null, on: null, asked: false }]));
+
+function renderBlocks(finalPass) {
+  const tb = $('blocks');
+  tb.innerHTML = '';
+  for (const b of BLOCKS) {
+    const s = blockState.get(b.page);
+    const tr = document.createElement('tr');
+    let icon = '', name = '<span class="dim">ยังไม่ได้อ่าน</span>', raw = '', state = '';
+    if (s.type !== null) {
+      const t = TYPE_BY_ID.get(s.type);
+      icon = iconSvg(t ? t.cat : 'other');
+      name = t ? t.name : `ไม่รู้จักรหัสนี้`;
+      raw = `${s.type} (0x${s.type.toString(16).toUpperCase()})`;
+      if (s.type === 0) { name = '<span class="dim">ว่าง</span>'; icon = ''; }
+    } else if (finalPass && s.asked) {
+      name = '<span class="dim">ไม่ตอบ</span>';
+    }
+    if (s.on !== null) state = `<span class="pill ${s.on ? 'on' : 'off'}">${s.on ? 'ON' : 'OFF'}</span>`;
+    tr.innerHTML = `<td><strong>${b.key}</strong></td><td class="ico">${icon}</td><td>${name}</td><td class="dim">${raw}</td><td>${state}</td>`;
+    tb.appendChild(tr);
+  }
+}
+
+let lastTempoVal = null, tapCount = 0, tapHide = null, pendingTap = null, tapAwait = false, lastNameChangeAt = 0;
+function watchTempo(v) {
+  if (lastTempoVal !== null && v !== lastTempoVal && performance.now() - lastNameChangeAt < 700) {
+    log('', `Tempo เปลี่ยนหลังชื่อ Rig เปลี่ยน (${lastTempoVal} → ${v}) ถือเป็นการเปลี่ยนพรีเซต ไม่นับเป็น Tap`);
+    lastTempoVal = v; return;
+  }
+  if (lastTempoVal !== null && v !== lastTempoVal && !pendingTap) {
+    pendingTap = { from: lastTempoVal, to: v, rig: $('rigName').textContent, oldText: $('bpm').textContent };
+    send(sysex(0x43, 0x00, 0x00, 0x01), '', true);
+    const mine = pendingTap;
+    setTimeout(() => { if (pendingTap === mine) pendingTap = null; }, 700);
+  }
+  lastTempoVal = v;
+}
+function resolveTap(newName) {
+  const t = pendingTap;
+  if (!t) return;
+  pendingTap = null;
+  if (newName !== t.rig) { log('', `Tempo เปลี่ยนเพราะเปลี่ยน Rig (${t.rig} → ${newName}) ไม่นับเป็น Tap`); return; }
+  tapCount++;
+  tapAwait = true;
+  $('tapNew').textContent = $('bpm').textContent;
+  $('tapOld').textContent = `(ก่อนหน้า ${t.oldText}, รหัสดิบ ${t.from} → ${t.to})`;
+  $('tapBox').style.display = 'block';
+  $('tapStat').textContent = `ตรวจพบแล้ว ${tapCount} ครั้ง ล่าสุดเมื่อ ${new Date().toLocaleTimeString('en-GB')}`;
+  log('', `ตรวจพบ TAP TEMPO: รหัสดิบ ${t.from} → ${t.to} (Rig ยังเป็น "${newName}")`);
+  clearTimeout(tapHide);
+  tapHide = setTimeout(() => { $('tapBox').style.display = 'none'; }, 3000);
+}
+setInterval(() => {
+  if ($('autoAll').checked && output && !scanBusy) send(sysex(0x41, 0x00, 0x04, 0x00), '', true);
+}, 90);
+
+function handleParam(page, addr, v) {
+  if (page === 0x04 && addr === 0x00) {
+    tempoRaw = v;
+    watchTempo(v);
+    const bpm = (v / 64).toFixed(1);
+    $('bpm').textContent = bpm;
+    $('bpmSrc').textContent = `คำนวณจากรหัสดิบ ${v} ÷ 64`;
+    sysexBpmAt = performance.now();
+    if ($('tapBox').style.display === 'block') $('tapNew').textContent = bpm;
+    return true;
+  }
+  const s = blockState.get(page);
+  if (!s) return false;
+  if (addr === 0x00) { s.type = v; renderBlocks(false); return true; }
+  if (addr === 0x03) { s.on = v === 1; renderBlocks(false); return true; }
+  return false;
+}
+
+function scanBlocks() {
+  if (!output) { setStatus('ยังไม่ได้เลือกพอร์ตส่ง', 'err'); return; }
+  for (const s of blockState.values()) { s.type = null; s.on = null; s.asked = true; }
+  renderBlocks(false);
+  let delay = 0;
+  for (const b of BLOCKS) {
+    setTimeout(() => send(sysex(0x41, 0x00, b.page, 0x00), `ขอชนิดเอฟเฟกต์บล็อก ${b.key}`), delay);
+    delay += 70;
+    setTimeout(() => send(sysex(0x41, 0x00, b.page, 0x03), `ขอสถานะบล็อก ${b.key}`), delay);
+    delay += 70;
+  }
+  setTimeout(() => renderBlocks(true), delay + 1500);
+}
+
+function describe(d) {
+  const status = d[0];
+  if (status === 0xF0) {
+    const isKemper = d[1] === 0x00 && d[2] === 0x20 && d[3] === 0x33;
+    if (!isKemper) return 'SysEx ของอุปกรณ์อื่น';
+    const fn = d[6];
+    if (fn === 0x03) {
+      const s = ascii(d.slice(10, d.length - 1));
+      if (d[8] === 0x00 && d[9] === 0x01) { const prevName = $('rigName').textContent; $('rigName').textContent = s || '(ว่าง)'; if (prevName !== $('rigName').textContent && prevName !== 'ยังไม่มี') { lastNameChangeAt = performance.now(); pollQueue.length = 0; pollQueue.push(...fullQueue()); }
+        if (nameSentAt) { $('rttMs').textContent = Math.round(performance.now() - nameSentAt) + ' ms'; nameSentAt = 0; } resolveTap($('rigName').textContent); }
+      return `คำตอบแบบข้อความ (0x03) page ${d[8].toString(16)} addr ${d[9].toString(16)}: "${s}"`;
+    }
+    if (fn === 0x3C) {
+      const s = ascii(d.slice(10, d.length - 1));
+      const printable = (Array.from(d.slice(10, d.length - 1), (b) => String.fromCharCode(b)).join('').match(/[ -~]{2,}/g) || []).sort((a, b) => b.length - a.length)[0] || s;
+      if (tempoRaw !== null) tempoCache.set(tempoRaw, printable);
+      showTempoText(printable);
+      return `ข้อความแสดงผล (0x3C): "${printable}"`;
+    }
+    if (fn === 0x07) return `คำตอบข้อความแบบ extended (0x07): "${ascii(d.slice(13, d.length - 1))}"`;
+    if (fn === 0x01 && d.length >= 13) {
+      const v = (d[10] << 7) | d[11];
+      const known = handleParam(d[8], d[9], v);
+      return `ค่าพารามิเตอร์เดี่ยว (0x01) page ${d[8].toString(16)} addr ${d[9].toString(16)} ค่า ${v}${known ? (d[8] === 4 ? ' (กำลังแปลงเป็น BPM)' : ' (อัปเดตตารางบล็อกแล้ว)') : ''}`;
+    }
+    return `SysEx ของ Kemper function 0x${fn.toString(16)}`;
+  }
+  const type = status & 0xF0, c = (status & 0x0F) + 1;
+  if (type === 0xC0) return `Program Change ${d[1]} ช่อง ${c}`;
+  if (type === 0xB0) return `Control Change ${d[1]} = ${d[2]} ช่อง ${c}`;
+  if (type === 0x90) return `Note On ${d[1]} ช่อง ${c}`;
+  if (type === 0x80) return `Note Off ${d[1]} ช่อง ${c}`;
+  return '';
+}
+
+function onMessage(e) {
+  const d = e.data;
+  if (tnProbe && d[0] !== 0xF8 && d[0] !== 0xFE && !(d[0] === 0xF0 && (d[6] === 0x01 || d[6] === 0x03 || d[6] === 0x07))) tnProbe.other.set(Array.from(d).slice(0, 14).map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' '), (tnProbe.other.get(Array.from(d).slice(0, 14).map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' ')) || 0) + 1);
+  if (scanTarget && d[0] === 0xF0 && d[6] === 0x01 && d.length >= 13) { scanTarget.set((d[8] << 7) | d[9], (d[10] << 7) | d[11]); return; }
+  if (scanBusy) return;
+  if (d[0] === 0xF8) { onClock(e.timeStamp); return; }
+  if (d[0] === 0xFE) return;
+  received++;
+  $('count').textContent = String(received);
+  const note = describe(d);
+  if ($('autoAll').checked && /page 4 addr 0 |ข้อความแสดงผล|อัปเดตตารางบล็อกแล้ว|\(0x03\) page 0 addr 1/.test(note)) return;
+  log('in', hex(d) + (note ? '   ' + note : ''));
+}
+
+function onClock(t) {
+  lastClockAt = performance.now();
+  clockTimes.push(t);
+  if (clockTimes.length > 49) clockTimes.shift();
+  if (clockTimes.length >= 25 && clockTimes.length % 12 === 0 && performance.now() - sysexBpmAt > 5000) {
+    const span = clockTimes[clockTimes.length - 1] - clockTimes[0];
+    const tick = span / (clockTimes.length - 1);
+    $('bpm').textContent = (60000 / (tick * 24)).toFixed(1);
+    $('bpmSrc').textContent = 'จาก MIDI clock';
+  }
+}
+setInterval(() => {
+  if (lastClockAt && performance.now() - lastClockAt > 2500) {
+    clockTimes.length = 0; lastClockAt = 0;
+  }
+}, 1000);
+
+// Tempo: read the rig tempo value (page 04, address 00), then ask the Kemper to render it as display text
+let sysexBpmAt = 0, tempoRaw = null;
+const tempoCache = new Map();
+function showTempoText(s) {
+  const printable = (s.match(/[ -~]{2,}/g) || []).sort((a, b) => b.length - a.length)[0] || s;
+  const m = printable.match(/\d+(\.\d+)?/);
+  $('bpm').textContent = m ? m[0] : printable;
+  if (tapAwait) { $('tapNew').textContent = $('bpm').textContent; tapAwait = false; }
+  $('bpmSrc').textContent = 'จากเครื่อง (Rig Tempo)';
+  sysexBpmAt = performance.now();
+}
+function requestTempo(silent) {
+  send(sysex(0x41, 0x00, 0x04, 0x00), 'ขอค่า Tempo ของ Rig', silent);
+}
+
+function fillPorts() {
+  const keepIn = $('inPort').value, keepOut = $('outPort').value;
+  const make = (sel, ports, keep) => {
+    sel.innerHTML = '';
+    if (ports.size === 0) {
+      const o = document.createElement('option');
+      o.value = ''; o.textContent = 'ไม่พบพอร์ต';
+      sel.appendChild(o); return;
+    }
+    let pick = '';
+    ports.forEach((p) => {
+      const o = document.createElement('option');
+      o.value = p.id; o.textContent = p.name || p.id;
+      sel.appendChild(o);
+      if (!pick && /kemper|profiler|player/i.test(p.name || '')) pick = p.id;
+    });
+    const wanted = keep && ports.has(keep) ? keep : (pick || ports.values().next().value.id);
+    sel.value = wanted;
+  };
+  make($('inPort'), access.inputs, keepIn);
+  make($('outPort'), access.outputs, keepOut);
+  bindPorts();
+}
+
+function bindPorts() {
+  if (input) input.onmidimessage = null;
+  input = access.inputs.get($('inPort').value) || null;
+  output = access.outputs.get($('outPort').value) || null;
+  if (input) input.onmidimessage = onMessage;
+  if (input || output) {
+    setStatus(`เชื่อมแล้ว รับจาก: ${input ? input.name : 'ไม่มี'}  ส่งไป: ${output ? output.name : 'ไม่มี'}`, 'ok');
+  } else {
+    setStatus('ยังไม่พบพอร์ต MIDI เสียบสาย USB แล้วลองเชื่อมต่อใหม่ หรือปิด Rig Manager ก่อน', 'err');
+  }
+}
+
+async function connect() {
+  if (!navigator.requestMIDIAccess) {
+    setStatus('เบราว์เซอร์นี้ไม่รองรับ Web MIDI ให้เปิดไฟล์นี้ด้วย Chrome หรือ Edge', 'err');
+    return;
+  }
+  try {
+    access = await navigator.requestMIDIAccess({ sysex: true });
+  } catch (err) {
+    setStatus('ไม่ได้รับอนุญาตให้ใช้ MIDI/SysEx: ' + err.message, 'err');
+    return;
+  }
+  access.onstatechange = (ev) => {
+    log('sys', `พอร์ต ${ev.port.name} (${ev.port.type}) ${ev.port.state}`);
+    fillPorts();
+  };
+  fillPorts();
+  log('sys', `พบพอร์ตรับ ${access.inputs.size} พอร์ต พอร์ตส่ง ${access.outputs.size} พอร์ต`);
+}
+
+function send(bytes, note, silent) {
+  if (!output) { if (!silent) setStatus('ยังไม่ได้เลือกพอร์ตส่ง', 'err'); return false; }
+  try { output.send(bytes); } catch (err) { log('sys', 'ส่งไม่สำเร็จ: ' + err.message); return false; }
+  if (!silent) log('out', hex(bytes) + (note ? '   ' + note : ''));
+  return true;
+}
+
+const reqName = () => send(sysex(0x43, 0x00, 0x00, 0x01), 'ขอชื่อ Rig (string 0x43)');
+const reqSlot = () => send(sysex(0x47, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01), 'ขอชื่อ Slot 1 (extended 0x47)');
+
+function parseHexByte(v) {
+  const n = parseInt(v.trim(), 16);
+  return Number.isInteger(n) && n >= 0 && n <= 0x7F ? n : null;
+}
+
+$('scan').onclick = scanBlocks;
+$('reqTempo').onclick = () => requestTempo(false);
+// Auto refresh: the Kemper never pushes changes, so ask for everything in a loop, one small request every 40 ms
+let pollQueue = [];
+let pollStepN = 0, lastRefill = performance.now(), nameSentAt = 0, pollTimer = null;
+function fullQueue() {
+  const q = [sysex(0x41, 0x00, 0x04, 0x00)];                // rig tempo
+  for (const b of BLOCKS) {
+    q.push(sysex(0x41, 0x00, b.page, 0x03));                // on/off
+    q.push(sysex(0x41, 0x00, b.page, 0x00));                // effect type
+  }
+  return q;
+}
+function pollStep() {
+  if (!$('autoAll').checked || !output || scanBusy) return;
+  pollStepN++;
+  if (pollStepN % 4 === 0) {                                // rig name every 4th step so a change is caught fast
+    nameSentAt = performance.now();
+    send(sysex(0x43, 0x00, 0x00, 0x01), '', true);
+    return;
+  }
+  if (pollQueue.length === 0) {
+    const now = performance.now();
+    $('cycleMs').textContent = Math.round(now - lastRefill) + ' ms';
+    lastRefill = now;
+    pollQueue.push(...fullQueue());
+  }
+  send(pollQueue.shift(), '', true);
+}
+function setPollSpeed(ms) {
+  clearInterval(pollTimer);
+  pollTimer = setInterval(pollStep, ms);
+}
+setPollSpeed(40);
+renderBlocks(false);
+$('pollSpeed').onchange = () => setPollSpeed(parseInt($('pollSpeed').value, 10));
+$('connect').onclick = connect;
+$('inPort').onchange = bindPorts;
+$('outPort').onchange = bindPorts;
+$('reqName').onclick = reqName;
+$('reqSlot').onclick = reqSlot;
+$('reqAll').onclick = () => { reqName(); setTimeout(reqSlot, 200); };
+$('sendPc').onclick = () => {
+  const n = Math.max(0, Math.min(127, parseInt($('pcNum').value, 10) || 0));
+  send([0xC0 | ch(), n], `Program Change ${n}`);
+};
+$('stompOn').onclick = () => send([0xB0 | ch(), 17, 127], 'Stomp A เปิด');
+$('stompOff').onclick = () => send([0xB0 | ch(), 17, 0], 'Stomp A ปิด');
+$('reqParam').onclick = () => {
+  const p = parseHexByte($('page').value), a = parseHexByte($('addr').value);
+  if (p === null || a === null) { setStatus('Page และ Address ต้องเป็นเลขฐานสิบหก 00 ถึง 7F', 'err'); return; }
+  send(sysex(0x41, 0x00, p, a), `ขอค่าพารามิเตอร์ page ${p.toString(16)} addr ${a.toString(16)}`);
+};
+$('sendRaw').onclick = () => {
+  const parts = $('raw').value.split(/[\s,]+/).filter(Boolean);
+  const bytes = parts.map((x) => parseInt(x, 16));
+  if (!bytes.length || bytes.some((b) => !Number.isInteger(b) || b < 0 || b > 255)) {
+    setStatus('ข้อความดิบต้องเป็นเลขฐานสิบหกคั่นด้วยเว้นวรรค', 'err'); return;
+  }
+  send(bytes, 'ข้อความดิบ');
+};
+$('copyLog').onclick = async () => {
+  try { await navigator.clipboard.writeText(logLines.join('\n')); setStatus('คัดลอกบันทึกแล้ว', 'ok'); }
+  catch (e) { setStatus('คัดลอกไม่ได้ ให้ลากเลือกข้อความในกล่องบันทึกแล้วคัดลอกเอง', 'err'); }
+};
+$('clearLog').onclick = () => { logLines.length = 0; $('log').innerHTML = ''; };
+
+// ---------- Morph probe: snapshot every parameter, then diff ----------
+let scanTarget = null, scanBusy = false, scanStopFlag = false;
+const scanSlots = [null, null, null];
+async function runScan(slot) {
+  if (!output) { setStatus('ยังไม่ได้เลือกพอร์ตส่ง', 'err'); return; }
+  if (scanBusy) return;
+  const from = parseHexByte($('scanFrom').value), to = parseHexByte($('scanTo').value);
+  if (from === null || to === null || to < from) { setStatus('Page เริ่ม/จบ ต้องเป็นเลขฐานสิบหก 00 ถึง 7F', 'err'); return; }
+  scanBusy = true; scanStopFlag = false;
+  const map = new Map();
+  scanTarget = map;
+  const total = (to - from + 1) * 128;
+  let n = 0;
+  for (let p = from; p <= to && !scanStopFlag; p++) {
+    for (let a = 0; a < 128 && !scanStopFlag; a++) {
+      output.send(sysex(0x41, 0x00, p, a));
+      n++;
+      if (n % 64 === 0) $('scanInfo').textContent = `สแกนที่ ${slot + 1}: ถามแล้ว ${n}/${total}, เครื่องตอบ ${map.size} ค่า`;
+      await new Promise((r) => setTimeout(r, 5));
+    }
+  }
+  await new Promise((r) => setTimeout(r, 700));
+  scanTarget = null; scanBusy = false;
+  if (!scanStopFlag) scanSlots[slot] = map;
+  $('scanInfo').textContent = scanStopFlag ? 'หยุดแล้ว (ไม่เก็บผล)' : `สแกนที่ ${slot + 1} เสร็จ เครื่องตอบ ${map.size} ค่า`;
+}
+function showDiff() {
+  const [A, B, C] = scanSlots;
+  if (!A || !B) { $('scanInfo').textContent = 'ต้องสแกนที่ 1 และ 2 ให้เสร็จก่อน'; return; }
+  const rows = [];
+  for (const [k, va] of A) {
+    if (!B.has(k)) continue;
+    const vb = B.get(k);
+    if (va === vb) continue;
+    if (C && C.has(k) && C.get(k) !== va) continue;   // changed by itself without Morph, so ignore
+    rows.push([k >> 7, k & 127, va, vb]);
+  }
+  rows.sort((x, y) => x[0] - y[0] || x[1] - y[1]);
+  const h = (v) => v.toString(16).toUpperCase().padStart(2, '0');
+  let html = `<p class="note">ค่าที่เปลี่ยนตาม Morph: ${rows.length} ค่า${C ? ' (กรองค่าที่เปลี่ยนเองแล้ว)' : ' (ยังไม่ได้สแกนที่ 3 อาจมีค่ารบกวนปนอยู่)'}</p>`;
+  if (rows.length) {
+    html += '<table><thead><tr><th>Page</th><th>Addr</th><th>ตอนปิด</th><th>ตอนเปิด</th></tr></thead><tbody>' +
+      rows.slice(0, 300).map((r) => `<tr><td>${h(r[0])}</td><td>${h(r[1])}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`).join('') + '</tbody></table>';
+    log('sys', 'ผลต่าง Morph (page addr ปิด→เปิด): ' + rows.slice(0, 300).map((r) => `${h(r[0])}:${h(r[1])} ${r[2]}→${r[3]}`).join(', '));
+  }
+  $('scanOut').innerHTML = html;
+  $('scanInfo').textContent = `ตัวอย่างค่าที่ได้เก็บไว้: สแกน1=${A.size}, สแกน2=${B.size}, สแกน3=${C ? C.size : 'ยังไม่ได้ทำ'}`;
+}
+$('scan1').onclick = () => runScan(0);
+$('scan2').onclick = () => runScan(1);
+$('scan3').onclick = () => runScan(2);
+$('scanDiff').onclick = showDiff;
+$('scanStop').onclick = () => { scanStopFlag = true; };
+
+// ---------- Tuner probe: poll a range of parameters several times while a note is played ----------
+let tnProbe = null, tnStop = false;
+$('tnOn').onclick = () => { if (output) { output.send([0xB0 | ch(), 31, 1]); log('sys', 'ส่ง CC 31 = 1 (เปิด Tuner)'); } };
+$('tnOff').onclick = () => { if (output) { output.send([0xB0 | ch(), 31, 0]); log('sys', 'ส่ง CC 31 = 0 (ปิด Tuner)'); } };
+$('tnStop').onclick = () => { tnStop = true; };
+$('tnRun').onclick = async () => {
+  if (!output) { setStatus('ยังไม่ได้เลือกพอร์ตส่ง', 'err'); return; }
+  if (scanBusy) return;
+  const from = parseHexByte($('tnFrom').value), to = parseHexByte($('tnTo').value), rounds = Math.max(2, Math.min(30, parseInt($('tnRounds').value, 10) || 8));
+  if (from === null || to === null || to < from) { setStatus('Page เริ่ม/จบ ต้องเป็นเลขฐานสิบหก 00 ถึง 7F', 'err'); return; }
+  scanBusy = true; tnStop = false; tnProbe = { other: new Map() };
+  const hist = new Map();
+  for (let r = 0; r < rounds && !tnStop; r++) {
+    const map = new Map(); scanTarget = map;
+    for (let p = from; p <= to && !tnStop; p++) {
+      for (let a = 0; a < 128 && !tnStop; a++) { output.send(sysex(0x41, 0x00, p, a)); await new Promise((x) => setTimeout(x, 3)); }
+      $('tnInfo').textContent = `รอบ ${r + 1}/${rounds} page ${p.toString(16).toUpperCase()} (เล่นโน้ตค้างไว้และขยับสายให้เพี้ยนเล็กน้อย)`;
+    }
+    await new Promise((x) => setTimeout(x, 300));
+    for (const [k, v] of map) { if (!hist.has(k)) hist.set(k, []); hist.get(k).push(v); }
+  }
+  scanTarget = null; scanBusy = false;
+  const h = (v) => v.toString(16).toUpperCase().padStart(2, '0');
+  const rows = [];
+  for (const [k, vs] of hist) { const u = [...new Set(vs)]; if (u.length > 1) rows.push([k >> 7, k & 127, u.length, vs]); }
+  rows.sort((x, y) => x[0] - y[0] || x[1] - y[1]);
+  let html = `<p class="note">ค่าที่เปลี่ยนระหว่างรอบ: ${rows.length} ค่า (ถามได้ ${hist.size} ค่า)</p>`;
+  if (rows.length) html += '<table><thead><tr><th>Page</th><th>Addr</th><th>ค่าต่างกัน</th><th>ค่าแต่ละรอบ</th></tr></thead><tbody>' +
+    rows.slice(0, 200).map((r) => `<tr><td>${h(r[0])}</td><td>${h(r[1])}</td><td>${r[2]}</td><td>${r[3].join(', ')}</td></tr>`).join('') + '</tbody></table>';
+  const oth = [...tnProbe.other.entries()];
+  html += `<p class="note">ข้อความที่เครื่องส่งมาเอง ไม่ได้ถาม: ${oth.length} แบบ</p>` + (oth.length ? '<ul>' + oth.slice(0, 40).map(([m, n]) => `<li><code>${m}</code> x${n}</li>`).join('') + '</ul>' : '');
+  $('tnOut').innerHTML = html;
+  log('sys', 'ผล Tuner probe: ' + (rows.slice(0, 100).map((r) => `${h(r[0])}:${h(r[1])} [${r[3].join(',')}]`).join(' ') || 'ไม่มีค่าที่เปลี่ยน') + ' | ข้อความเอง: ' + (oth.map(([m, n]) => `${m} x${n}`).join(' ; ') || 'ไม่มี'));
+  $('tnInfo').textContent = tnStop ? 'หยุดแล้ว' : 'ตรวจเสร็จ ถ้ามีค่าที่เปลี่ยน กดคัดลอกบันทึกทั้งหมดในหัวข้อ 6 แล้วส่งมาให้ผมดู';
+  tnProbe = null;
+};
+
+// ---------- Tuner live monitor ----------
+const lvKeys = []; for (let a = 0x48; a <= 0x5F; a++) lvKeys.push([0x7D, a]); for (let a = 0x4E; a <= 0x53; a++) lvKeys.push([0x7C, a]);
+const lvStat = new Map(); let lvTimer = null, lvIdx = 0, lvMarks = [], lvGot = 0, lvSent = 0, lvChanged = 0;
+function lvRender() {
+  const h = (v) => v.toString(16).toUpperCase().padStart(2, '0');
+  let html = `<p class="note">ถามไป ${lvSent} ครั้ง เครื่องตอบ ${lvGot} ครั้ง ค่าเปลี่ยนไปแล้ว ${lvChanged} ครั้ง</p><table><thead><tr><th>Page</th><th>Addr</th><th>ตอนนี้</th><th>ต่ำสุด</th><th>สูงสุด</th></tr></thead><tbody>`;
+  for (const [pg, ad] of lvKeys) { const st = lvStat.get((pg << 7) | ad); if (!st) continue; html += `<tr><td>${h(pg)}</td><td>${h(ad)}</td><td>${st.cur}</td><td>${st.min}</td><td>${st.max}</td></tr>`; }
+  html += '</tbody></table>';
+  if (lvMarks.length) html += '<p class="note">จดไว้: ' + lvMarks.join(' ; ') + '</p>';
+  $('lvOut').innerHTML = html;
+}
+$('lvOn').onclick = () => {
+  if (!output || lvTimer) return;
+  lvStat.clear(); lvMarks = []; lvGot = lvSent = lvChanged = 0;
+  scanTarget = { set(k, v) { lvGot++; const st = lvStat.get(k) || { min: v, max: v, cur: v }; if (st.cur !== v) lvChanged++; st.cur = v; st.min = Math.min(st.min, v); st.max = Math.max(st.max, v); lvStat.set(k, st); } };
+  lvTimer = setInterval(() => { const [pg, ad] = lvKeys[lvIdx++ % lvKeys.length]; output.send(sysex(0x41, 0x00, pg, ad)); lvSent++; }, 6);
+  lvRenderTimer = setInterval(lvRender, 150);
+};
+let lvRenderTimer = null;
+$('lvOff').onclick = () => { clearInterval(lvTimer); clearInterval(lvRenderTimer); lvTimer = null; scanTarget = null; };
+$('lvMark').onclick = () => {
+  const snap = lvKeys.map(([pg, ad]) => { const st = lvStat.get((pg << 7) | ad); return st ? `${pg.toString(16).toUpperCase()}:${ad.toString(16).toUpperCase().padStart(2, '0')}=${st.cur}` : null; }).filter(Boolean).join(' ');
+  const t = `${$('lvNote').value || '?'} -> ${snap}`; lvMarks.push(t); log('sys', 'จดโน้ต ' + t); lvRender();
+};
+</script>
+</body>
+</html>
